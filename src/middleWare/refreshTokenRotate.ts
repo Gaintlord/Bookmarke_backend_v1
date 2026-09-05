@@ -3,49 +3,53 @@ import {
   createAccessToken,
   decodeRefreshToken,
   verifyRefreshToken,
-} from "../utils/accesstoken";
+} from "../utils/tokenManager";
 import { refreshTokenRotation } from "../controllers/refreshTokenController";
+import { refreshTokenExp } from "../utils/expirationManager";
 
 export const refreshTokRotate = async (req: Request, res: Response) => {
-  const cookies = req.cookies;
-  console.log("### at refresh token ###");
-
-  const verifiedRefToken = await verifyRefreshToken(cookies.DR_TAG_TOKEN);
+  const refreshToken = req.cookies.DR_TAG_TOKEN || req.query.tags;
+  console.log(refreshToken);
+  const verifiedRefToken = await verifyRefreshToken(refreshToken);
 
   //@ts-ignore
 
   if (verifiedRefToken.status) {
     //@ts-ignore
-    if (verifiedToken.err == "expiredToken") {
+    if (verifiedRefToken.err == "expiredToken") {
       //@ts-ignore
-      let { email, userId } = await decodeRefreshToken(cookies.DR_TAG_TOKEN);
-
-      console.log(email);
-      console.log(userId);
-
-      await refreshTokenRotation(
-        cookies.DR_TAG_TOKEN,
+      console.log("!!!!!!!!!! ref token expired !!!!!!!!!");
+      const { newAccessToken, newRefToken } = await refreshTokenRotation(
+        refreshToken,
         req.ip || "unkown",
         req.get("User-Agent") || "unknown",
-        email,
-        userId
       );
-      return;
+      return res
+        .status(201)
+        .header("N_AT", newAccessToken)
+        .header("N_RT", newRefToken)
+        .cookie("DR_TAG_TOKEN", newRefToken, {
+          httpOnly: true,
+          sameSite: true,
+          maxAge: refreshTokenExp,
+          secure: false,
+        })
+        .json({ accessToken: newAccessToken });
     } else {
       return res.status(401).json({ err: "Invalid Token" });
     }
-  } else {
     console.log(verifiedRefToken);
+  } else {
+    console.log("### ref token exist & made new access Token ###");
     const newAccessToken = await createAccessToken(
       //@ts-ignore
       verifiedRefToken.email as string,
       //@ts-ignore
-      verifiedRefToken.userId as string
+      verifiedRefToken.userId as string,
     );
-    res
+    return res
       .status(201)
       .header("N_AT", newAccessToken)
       .json({ accessToken: newAccessToken });
-    return;
   }
 };

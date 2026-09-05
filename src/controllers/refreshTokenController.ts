@@ -1,56 +1,59 @@
 import { eq } from "drizzle-orm";
 import { refreshTokenTable } from "../models/dbSchemas";
 import { db } from "../utils/dataBaseUtil";
-import { HashFunction } from "../utils/hashingUtil";
-import { createRefreshToken } from "../utils/accesstoken";
+import { HashFunction, hashWCrypto } from "../utils/hashingUtil";
+import {
+  createAccessToken,
+  createRefreshToken,
+  decodeRefreshToken,
+} from "../utils/tokenManager";
 import { refreshTokenExp } from "../utils/expirationManager";
 
 export const refreshTokenRotation = async (
   oldRefToken: string,
   userIp: string,
-  userAgent: string,
-  email: string,
-  userId: string
+  userAgent: string
 ) => {
-  const oldtoken = await HashFunction(oldRefToken);
-  const newRefToken = await createRefreshToken(email, userId);
-  const newHashToken = await HashFunction(newRefToken);
-  const userID = parseInt(userId);
-  db.transaction(async (tx) => {
-    await tx
-      .update(refreshTokenTable)
-      .set({ revoked: true })
-      .where(eq(refreshTokenTable.tokenHash, oldtoken));
+  let userObj = await decodeRefreshToken(oldRefToken);
+  console.log(userObj);
 
-    await tx.insert(refreshTokenTable).values({
-      userId: userID,
-      tokenHash: newHashToken,
-      userAgent: userAgent,
-      ipAddress: userIp,
-      expiresAt: new Date(Date.now() + refreshTokenExp),
+  //@ts-ignore
+  const hashedOldToken = await hashWCrypto(userObj.jwtUid);
+
+  const { refreshToken, jwtUid } = await createRefreshToken(
+    // @ts-ignore
+    userObj.email,
+    // @ts-ignore
+    userObj.userId
+  );
+  const newHashToken = await hashWCrypto(jwtUid);
+  // @ts-ignore
+  const userID = parseInt(userObj.userId);
+  console.log(`!!!!!!!!!! BEFORE TRANSACTION !!!!!!!!!!`);
+  console.log(hashedOldToken);
+
+  try {
+    await db.transaction(async (tx) => {
+      await tx
+        .update(refreshTokenTable)
+        .set({ revoked: true })
+        .where(eq(refreshTokenTable.tokenHash, hashedOldToken));
+
+      const response = await tx.insert(refreshTokenTable).values({
+        userId: userID,
+        tokenHash: newHashToken,
+        userAgent: userAgent,
+        ipAddress: userIp,
+        expiresAt: new Date(Date.now() + refreshTokenExp),
+      });
     });
-  });
-};
-export const revokeOldAndAddNewRefToken = async (
-  userIp: string,
-  userAgent: string,
-  userId: number,
-  newRefToken: string
-) => {
-  const newHashToken = await HashFunction(newRefToken);
+  } catch (err) {
+    console.log(`#######!!!!!!!!!! ${err} !!!!!!!!!! #######`);
+  }
+  console.log(`!!!!!!!!!! AFTER TRANSACTION !!!!!!!!!!`);
 
-  db.transaction(async (tx) => {
-    await tx
-      .update(refreshTokenTable)
-      .set({ revoked: true })
-      .where(eq(refreshTokenTable.ipAddress, userIp));
-
-    await tx.insert(refreshTokenTable).values({
-      userId: userId,
-      tokenHash: newHashToken,
-      userAgent: userAgent,
-      ipAddress: userIp,
-      expiresAt: new Date(Date.now() + refreshTokenExp),
-    });
-  });
+  // @ts-ignore
+  const newAccessToken = await createAccessToken(userObj.email, userObj.userId);
+  let newRefToken = refreshToken;
+  return { newAccessToken, newRefToken };
 };

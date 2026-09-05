@@ -54,7 +54,6 @@ export const redirectEmailVerify = async (
         return {
           refreshToken,
           accessToken,
-
           status: true,
           message: "verified",
         };

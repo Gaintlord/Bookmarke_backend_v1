@@ -1,5 +1,5 @@
 import { NextFunction, Request, Response } from "express";
-import { verifyAccesToken } from "../utils/accesstoken";
+import { verifyAccesToken } from "../utils/tokenManager";
 // import cookieParser from "cookie-parser";
 
 export const userReqAuth = async (
@@ -19,11 +19,8 @@ export const userReqAuth = async (
   if (!accessToken) {
     return res.status(401).json({ err: "Missing Token" });
   }
-  console.log(accessToken);
 
   const verifiedToken: any = await verifyAccesToken(accessToken);
-
-  console.log(verifiedToken);
 
   if (verifiedToken.status) {
     console.log(verifiedToken.err);

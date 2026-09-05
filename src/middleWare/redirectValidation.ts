@@ -1,6 +1,7 @@
 import { Request, RequestHandler, Response } from "express";
 import { emailVerify } from "../models/zodDataModel";
 import { redirectEmailVerify } from "../controllers/signUpEmailVerifyController";
+import { refreshTokenExp } from "../utils/expirationManager";
 
 export const redirectValidation: RequestHandler = async (
   req: Request,
@@ -25,7 +26,7 @@ export const redirectValidation: RequestHandler = async (
         httpOnly: true,
         sameSite: "strict",
         secure: false,
-        maxAge: response.expiration,
+        maxAge: refreshTokenExp,
       });
       res.status(201).json({
         status: true,

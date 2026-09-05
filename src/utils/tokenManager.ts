@@ -1,19 +1,18 @@
 import jwt, { TokenExpiredError } from "jsonwebtoken";
+import crypto from "crypto";
 
 const accessJwtSecret = process.env.JWT_SECRET_A || "SherhiKehde";
 const refreshJwtSecret = process.env.JWT_SECRET_R || "cheetahhiKehde";
+const jwtUid = crypto.randomUUID();
 
-export async function createAccessToken(
-  email: string,
-  userId: string
-): Promise<string> {
-  return jwt.sign({ email, userId }, accessJwtSecret, { expiresIn: "1h" });
+export async function createAccessToken(email: string, userId: string) {
+  return jwt.sign({ email, userId }, accessJwtSecret, { expiresIn: "30s" });
 }
-export async function createRefreshToken(
-  email: string,
-  userId: string
-): Promise<string> {
-  return jwt.sign({ email, userId }, refreshJwtSecret, { expiresIn: "30d" });
+export async function createRefreshToken(email: string, userId: string) {
+  let refreshToken = jwt.sign({ email, userId, jwtUid }, refreshJwtSecret, {
+    expiresIn: "1m",
+  });
+  return { refreshToken, jwtUid };
 }
 
 export async function verifyAccesToken(token: string) {
@@ -55,4 +54,8 @@ export async function verifyRefreshToken(token: string) {
 export async function decodeRefreshToken(token: string) {
   const decoded = jwt.decode(token);
   return decoded;
+}
+
+export function genCSRFString() {
+  return crypto.randomBytes(32).toString("hex");
 }

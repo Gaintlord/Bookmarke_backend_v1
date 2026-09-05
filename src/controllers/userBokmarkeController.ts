@@ -8,6 +8,9 @@ export const addUserBookmarkeToDb = async (
   hostName: string,
   userId: number
 ) => {
+  console.log(
+    "!########## WE ARE HERE AT addingbookmarke to db #############!"
+  );
   try {
     await db.insert(bokmarkeTable).values({
       userId: userId,
@@ -16,13 +19,22 @@ export const addUserBookmarkeToDb = async (
       hostName: hostName,
     });
   } catch (err) {
+    console.log("!#######################!");
+    console.log(err);
+    console.log("!#######################!");
     const timeNow = new Date();
     // @ts-ignore
     if (err.cause.code === "23505") {
-      await db
-        .update(bokmarkeTable)
-        .set({ reAddedAt: timeNow })
-        .where(eq(bokmarkeTable.pageLink, link));
+      try {
+        await db
+          .update(bokmarkeTable)
+          .set({ reAddedAt: timeNow })
+          .where(eq(bokmarkeTable.pageLink, link));
+      } catch (err) {
+        console.log("!!!!!!!!!!!!!!!!!!!!!!");
+        console.log(err);
+        console.log("!!!!!!!!!!!!!!!!!!!!!!");
+      }
     } else {
       console.log(`error for user ${userId} at ${new Date()} :\n\n`, err);
     }
