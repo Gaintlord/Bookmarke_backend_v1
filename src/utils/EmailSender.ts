@@ -5,17 +5,17 @@ const transporter = nodemailer.createTransport({
   port: 587,
   secure: false,
   auth: {
-    user: "brenda.howe@ethereal.email",
-    pass: "qXXruTregYvyRJQR2B",
+    user: "monserrat22@ethereal.email",
+    pass: "xnQbdQ95Kp2sQ3EUg1",
   },
 });
 
 export const emailSender = async (otp: string, email: string) => {
   try {
     const mailDetail = await transporter.sendMail({
-      from: "brenda.howe@ethereal.email",
+      from: "monserrat22@ethereal.email",
       to: email,
-      subject: "Your Freezebee Verification otp",
+      subject: "OTP verification for BokMarke",
       text: `your One Time Password Is ${otp}\n\n\n\n
       http://localhost:8081/api/v1/email-verify?userEmail=${email}&otp=${otp}`,
       html: emailHTML(otp, email),
@@ -63,3 +63,4 @@ const emailHTML = (otp: string, email: string): string => {
   </div>
 </div>`;
 };
+

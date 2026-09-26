@@ -1,0 +1,57 @@
+DASHBOARD SESSION / TOKEN REFRESH CHANGES
+Files: src/middleWare/refreshTokenRotate.ts
+       src/middleWare/logInAuthMidware.ts
+       src/middleWare/redirectValidation.ts
+       ../Bokmarke/bokmarke/src/utils/refreshSession.ts        (new)
+       ../Bokmarke/bokmarke/src/utils/dashboardBookmarkSummary.ts
+
+BEFORE | AFTER
+-------|------
+Login JSON body returned only { status, redirectTo }; access token existed only as an httpOnly cookie, so frontend stored undefined. | Login JSON now also returns accessToken, so the client store holds a real token. (accessToken)
+-------|------
+Email-verify 201 body returned { status, message, redirectTo }; no access token in body. | Email-verify 201 body now also returns accessToken. (accessToken: response.accessToken)
+-------|------
+/auth/refresh 200 body returned only { status: true }; client had no way to read the new token. | /auth/refresh 200 body now returns { status, accessToken }; rotated refresh token still stays in the httpOnly cookie. (accessToken: newAccessToken)
+-------|------
+Frontend had no refresh call; any 401 from the dashboard immediately logged the user out (clearAccessToken + /Login), so access-token expiry ended the session. | Frontend now calls GET /api/v1/auth/refresh on a 401 and retries once; logout happens only when the 14-day refresh token is also invalid.
+-------|------
+dashboardBookmarkSummary.ts fired one fetch and threw on 401. | dashboardBookmarkSummary.ts wraps the fetch, and on 401 runs refreshSession() then retries the same request before throwing.
+-------|------
+No client expiry handling existed. | New refreshSession.ts util performs the refresh with credentials: include and is single-flight, so concurrent 401s rotate the refresh token only once.
+-------|------
+Access token lifetime was fixed/hardcoded (1 min test value); refresh 5 min. | Access token 24h, refresh token 14d, read from .env (ACCESS_TOKEN_EXP / REFRESH_TOKEN_EXP).
+
+
+PER-WEBSITE DASHBOARD COLORS
+Files: src/utils/domainColor.ts                              (new)
+       src/controllers/dashboardController.ts
+       ../Bokmarke/bokmarke/src/utils/domainColor.ts          (new)
+       ../Bokmarke/bokmarke/src/utils/dashboardBookmarkSummary.ts
+       ../Bokmarke/bokmarke/src/Route/dashBoard.tsx
+
+BEFORE | AFTER
+-------|------
+Dashboard response had no color field; every website card rendered the same colour. | Dashboard response now includes color (plain name, e.g. "red") for every website.
+-------|------
+No domain-to-colour mapping existed; the domainColor DB table was never read or seeded. | New domainColor.ts exports DOMAIN_COLORS (color -> full domains) plus getDomainColor(), which inverts the map once for O(1) lookup and hashes unknown domains into the palette for a stable colour.
+-------|------
+dashboardController returned raw SQL rows (website, totalBookmarks, latestDate, latestImageLinks). | dashboardController adds color via getDomainColor(row.website) after the query; SQL is unchanged.
+-------|------
+Frontend card colour was hardcoded: toCollection used "bg-orange-500", add-bookmark used "bg-red-500". | Frontend maps the returned name to a Tailwind class (toColorClass) and derives a stable class for locally-added domains (getDomainColorClass).
+-------|------
+BookmarkSummary type had no color field. | BookmarkSummary now includes color: string.
+
+
+BARE DOMAIN-NAME COLOR MATCHING
+Files: src/utils/domainColor.ts
+       ../Bokmarke/bokmarke/src/utils/domainColor.ts
+
+BEFORE | AFTER
+-------|------
+Map keys were full domains ("youtube.com", "amazon.com", ...). | Map keys are bare domain names ("youtube", "amazon", ...); all TLDs removed and duplicates merged (pornhub.com + pornhub.org -> pornhub).
+-------|------
+getDomainColor matched the full host and hashed the full host for unknowns. | getDomainColor reduces the host to its first label (strip www/port/TLD) before lookup and hashing, so youtube.com -> red and amazon.com -> amber.
+-------|------
+Frontend COLOR_CLASS had no "black" entry, so a backend color "black" fell back to bg-slate-500. | Frontend COLOR_CLASS now includes black: "bg-black".
+-------|------
+Frontend getDomainColorClass hashed the full host and did not know any brand colors, so locally-added cards never matched the backend. | Frontend mirrors the bare-name DOMAIN_COLORS map, reduces to the first label, and shares the same palette order, so local cards match backend colors (amazon -> amber) and unknown domains hash identically.

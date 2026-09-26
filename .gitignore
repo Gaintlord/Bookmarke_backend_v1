@@ -2,4 +2,12 @@ node_modules
 .env
 drizzle.config.ts
 drizzle
+!drizzle/
+drizzle/*
+!drizzle/0010_chilly_triathlon.sql
+!drizzle/0011_petite_annihilus.sql
+!drizzle/meta/
+drizzle/meta/*
+!drizzle/meta/0010_snapshot.json
+!drizzle/meta/0011_snapshot.json
 dist

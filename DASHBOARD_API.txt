@@ -1,0 +1,149 @@
+================================================================================
+DASHBOARD BOOKMARK SUMMARY API
+================================================================================
+
+ENDPOINT
+--------------------------------------------------------------------------------
+GET /api/v1/dashboard/bookmark-summary
+
+PURPOSE
+--------------------------------------------------------------------------------
+Returns a summary of every website the authenticated user has saved bookmarks
+from. For each website it reports:
+
+  - the website host name (grouping key)
+  - the total number of bookmarks saved from that website
+  - the latest date a bookmark from that website was added/re-added
+  - the image links of the latest 3 bookmarks from that website
+
+The response is a RAW JSON ARRAY (one object per website), ordered by the most
+recently added website first.
+
+--------------------------------------------------------------------------------
+REQUEST
+--------------------------------------------------------------------------------
+
+Method
+  GET
+
+URL
+  /api/v1/dashboard/bookmark-summary
+
+Headers
+  Authorization: Bearer <ACCESS_TOKEN>        (required)
+  Cookie: ACCESS_TOKEN=<ACCESS_TOKEN>          (alternative to header)
+
+  The access token is verified by the userReqAuth middleware. Either the
+  Authorization Bearer header or the ACCESS_TOKEN cookie must be present.
+
+Body
+  None.
+
+Query parameters
+  None.
+
+Current user
+  The user id is taken from the verified access token; it is never passed by
+  the client.
+
+--------------------------------------------------------------------------------
+SUCCESS RESPONSE
+--------------------------------------------------------------------------------
+
+Status: 200 OK
+Content-Type: application/json
+
+Body: array of website summary objects.
+
+[
+  {
+    "website": "youtube.com",
+    "totalBookmarks": 12,
+    "latestDate": "2026-09-20T14:33:02.123Z",
+    "latestImageLinks": [
+      "https://i.ytimg.com/vi/abc123/hqdefault.jpg",
+      "https://i.ytimg.com/vi/def456/hqdefault.jpg",
+      "https://i.ytimg.com/vi/ghi789/hqdefault.jpg"
+    ]
+  },
+  {
+    "website": "github.com",
+    "totalBookmarks": 3,
+    "latestDate": "2026-09-18T09:05:41.000Z",
+    "latestImageLinks": [
+      "https://opengraph.githubassets.com/.../repo-a",
+      "https://opengraph.githubassets.com/.../repo-b",
+      "https://opengraph.githubassets.com/.../repo-c"
+    ]
+  }
+]
+
+Empty case: if the user has no bookmarks, the endpoint returns:
+
+  []
+
+--------------------------------------------------------------------------------
+RESPONSE FIELDS
+--------------------------------------------------------------------------------
+
+website           string   The bookmark host name (hostName column). Grouping key.
+                           Every object has a unique website value.
+
+totalBookmarks    number   Total count of bookmarks saved from this website.
+
+latestDate        string   ISO-8601 timestamp of the most recent reAddedAt value
+                           for this website (latest date a bookmark from this
+                           website was added, or re-added).
+
+latestImageLinks  string[] Array of imageLink URLs for the latest 3 bookmarks of
+                           this website, most recent first. May contain fewer
+                           than 3 entries if the website has fewer bookmarks.
+
+--------------------------------------------------------------------------------
+ERROR RESPONSES
+--------------------------------------------------------------------------------
+
+401 Unauthorized - no token supplied
+  { "err": "Missing access token" }
+
+401 Unauthorized - token expired
+  { "err": "Access token expired", "code": "ACCESS_TOKEN_EXPIRED" }
+
+401 Unauthorized - token invalid
+  { "err": "Invalid access token" }
+
+401 Unauthorized - token valid but user id unusable
+  { "err": "Invalid authenticated user" }
+
+500 Internal Server Error - database/query failure
+  { "err": "Unable to load dashboard bookmarks" }
+
+--------------------------------------------------------------------------------
+EXAMPLE CALLS
+--------------------------------------------------------------------------------
+
+curl (Authorization header):
+
+  curl -X GET "http://localhost:3000/api/v1/dashboard/bookmark-summary" \
+    -H "Authorization: Bearer <ACCESS_TOKEN>"
+
+curl (cookie):
+
+  curl -X GET "http://localhost:3000/api/v1/dashboard/bookmark-summary" \
+    -H "Cookie: ACCESS_TOKEN=<ACCESS_TOKEN>"
+
+--------------------------------------------------------------------------------
+IMPLEMENTATION NOTES
+--------------------------------------------------------------------------------
+
+Route      : src/routes/dashboardRoute.ts
+Middleware : src/middleWare/dashboardBookmarkSummary.ts
+Controller : src/controllers/dashboardController.ts (getBookmarkDashboard)
+Auth       : src/middleWare/userReqAuth.ts
+Data source: bokmarkeTable (columns: hostName, imageLink, reAddedAt, userId)
+
+"How recent" ordering, bookmark counts and the top-3 image selection are all
+computed in a single SQL statement. The "latest date" is MAX(reAddedAt) per
+website. When a user re-saves an existing bookmark, its reAddedAt is refreshed,
+so it becomes the latest bookmark for that website.
+================================================================================

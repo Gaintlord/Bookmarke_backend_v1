@@ -1,0 +1,161 @@
+================================================================================
+DOMAIN BOOKMARKS API
+================================================================================
+
+ENDPOINT
+--------------------------------------------------------------------------------
+GET /api/v1/bookmarks?domain=<domain>
+
+PURPOSE
+--------------------------------------------------------------------------------
+Returns every bookmark the authenticated user has saved from one website/domain.
+Each item contains only the data needed to render a bookmark:
+
+  - image     (bookmark thumbnail / preview image URL)
+  - link      (the bookmarked page URL)
+  - addedAtDate (ISO-8601 date the bookmark was added or re-added)
+
+The response is a RAW JSON ARRAY, ordered newest first (most recently
+added/re-added bookmark first). If the user has no bookmarks for the domain, an
+empty array is returned.
+
+--------------------------------------------------------------------------------
+REQUEST
+--------------------------------------------------------------------------------
+
+Method
+  GET
+
+URL
+  /api/v1/bookmarks?domain=<domain>
+
+Headers
+  Authorization: Bearer <ACCESS_TOKEN>        (required)
+  Cookie: ACCESS_TOKEN=<ACCESS_TOKEN>          (alternative to header)
+
+  The access token is verified by the userReqAuth middleware. Either the
+  Authorization Bearer header or the ACCESS_TOKEN cookie must be present.
+
+Query parameters
+  domain   string   (required) The website to filter by. Accepts a host name or
+                    URL; it is normalised to its registrable domain before the
+                    lookup, so "www.youtube.com", "https://youtube.com/watch?v=1"
+                    and "youtube.com" all resolve to "youtube.com".
+
+Body
+  None.
+
+Current user
+  The user id is taken from the verified access token; it is never passed by
+  the client.
+
+--------------------------------------------------------------------------------
+SUCCESS RESPONSE
+--------------------------------------------------------------------------------
+
+Status: 200 OK
+Content-Type: application/json
+
+Body: array of bookmark objects, newest first.
+
+[
+  {
+    "image": "https://i.ytimg.com/vi/abc123/hqdefault.jpg",
+    "link": "https://www.youtube.com/watch?v=abc123",
+    "addedAtDate": "2026-09-20T14:33:02.123Z"
+  },
+  {
+    "image": "https://i.ytimg.com/vi/def456/hqdefault.jpg",
+    "link": "https://www.youtube.com/watch?v=def456",
+    "addedAtDate": "2026-09-18T09:05:41.000Z"
+  }
+]
+
+Empty case: if the user has no bookmarks for the domain, the endpoint returns:
+
+  []
+
+--------------------------------------------------------------------------------
+RESPONSE FIELDS
+--------------------------------------------------------------------------------
+
+image         string   Bookmark preview image URL (imageLink column).
+
+link          string   The bookmarked page URL (pageLink column).
+
+addedAtDate   string   ISO-8601 timestamp of the bookmark's reAddedAt value,
+                       i.e. when it was added or most recently re-added. Using
+                       this field for ordering, the first array item is always
+                       the most recent.
+
+--------------------------------------------------------------------------------
+ERROR RESPONSES
+--------------------------------------------------------------------------------
+
+401 Unauthorized - no token supplied
+  { "err": "Missing access token" }
+
+401 Unauthorized - token expired
+  { "err": "Access token expired", "code": "ACCESS_TOKEN_EXPIRED" }
+
+401 Unauthorized - token invalid
+  { "err": "Invalid access token" }
+
+401 Unauthorized - token valid but user id unusable
+  { "err": "Invalid authenticated user" }
+
+400 Bad Request - domain query param missing/empty or not a parseable domain
+  { "err": "Missing or invalid domain" }
+
+500 Internal Server Error - database/query failure
+  { "err": "Unable to load bookmarks" }
+
+--------------------------------------------------------------------------------
+EXAMPLE CALLS
+--------------------------------------------------------------------------------
+
+curl (Authorization header):
+
+  curl -X GET "http://localhost:8080/api/v1/bookmarks?domain=youtube.com" \
+    -H "Authorization: Bearer <ACCESS_TOKEN>"
+
+curl (cookie):
+
+  curl -X GET "http://localhost:8080/api/v1/bookmarks?domain=youtube.com" \
+    -H "Cookie: ACCESS_TOKEN=<ACCESS_TOKEN>"
+
+--------------------------------------------------------------------------------
+FRONTEND INTEGRATION NOTES
+--------------------------------------------------------------------------------
+
+- Send credentials so the httpOnly ACCESS_TOKEN cookie is included when you rely
+  on cookies instead of the Bearer header (e.g. fetch(url, { credentials:
+  "include" })).
+- The domain value can be taken directly from the dashboard summary's `website`
+  field; it is already stored in the same registrable-domain form.
+- On 401, run the existing refresh flow (GET /api/v1/auth/refresh) and retry once
+  before logging the user out.
+- `addedAtDate` is a string; format it client-side (e.g. new
+  Date(addedAtDate).toLocaleDateString()).
+- An empty array is a valid, successful result — show an empty state rather than
+  an error.
+
+--------------------------------------------------------------------------------
+IMPLEMENTATION NOTES
+--------------------------------------------------------------------------------
+
+Route      : src/routes/bookmarkRoute.ts
+Middleware : src/middleWare/domainBookmarkList.ts
+Controller : src/controllers/userBokmarkeController.ts
+             (getUserBookmarksByDomain)
+Validation : src/models/zodDataModel.ts (domainBookmarkQuery)
+Auth       : src/middleWare/userReqAuth.ts
+Data source: bokmarkeTable (columns: userId, hostName, imageLink, pageLink,
+             reAddedAt, bokmarkeId)
+
+Domain normalisation uses getDomainName() (tldts) so inputs with www, ports or
+paths match the stored hostName. The lookup is served by the existing
+bookmark_dashboard_lookup_idx index on (userId, hostName, reAddedAt DESC,
+bokmarkeId DESC). Ordering is reAddedAt DESC (newest first), with bokmarkeId
+DESC as a stable tie-breaker.
+================================================================================

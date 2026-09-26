@@ -26,3 +26,7 @@ export const userSentBokmarke = z.object({
     hostName: z.string().max(512),
   }),
 });
+
+export const domainBookmarkQuery = z.object({
+  domain: z.string().trim().min(1).max(512),
+});

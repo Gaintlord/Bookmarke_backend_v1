@@ -41,11 +41,17 @@ export const bokmarkeTable = pgTable(
     imageLink: varchar({ length: 1024 }).notNull(),
     hostName: varchar({ length: 256 }).notNull(),
     createdAt: timestamp().defaultNow().notNull(),
-    reAddedAt: timestamp().defaultNow(),
+    reAddedAt: timestamp().defaultNow().notNull(),
   },
   (table) => [
     index("by_host_name").on(table.hostName),
     index("by_userId").on(table.userId),
+    index("bookmark_dashboard_lookup_idx").on(
+      table.userId,
+      table.hostName,
+      table.reAddedAt.desc(),
+      table.bokmarkeId.desc()
+    ),
   ]
 );
 

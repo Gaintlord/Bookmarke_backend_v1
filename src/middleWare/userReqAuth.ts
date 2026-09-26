@@ -7,27 +7,28 @@ export const userReqAuth = async (
   res: Response,
   next: NextFunction
 ) => {
-  const headerPayload = req.headers["authorization"];
-  console.log(headerPayload);
-  if (!headerPayload) {
-    return res.status(401).json({ err: "Missing Header" });
-  }
-  if (!headerPayload?.startsWith("Bearer")) {
-    return res.status(401).json({ err: "Missing Header" });
-  }
-  const accessToken = headerPayload?.split(" ")[1];
+  const headerPayload = req.get("authorization");
+  const bearerToken = headerPayload?.startsWith("Bearer ")
+    ? headerPayload.slice("Bearer ".length)
+    : undefined;
+  const cookieToken = req.cookies.ACCESS_TOKEN;
+  const accessToken =
+    typeof cookieToken === "string" ? cookieToken : bearerToken;
+
   if (!accessToken) {
-    return res.status(401).json({ err: "Missing Token" });
+    return res.status(401).json({ err: "Missing access token" });
   }
 
   const verifiedToken: any = await verifyAccesToken(accessToken);
 
   if (verifiedToken.status) {
-    console.log(verifiedToken.err);
     if (verifiedToken.err === "expiredToken") {
-      return res.status(200).header("AC_ERR", "YL203").json({ err: "YL203" });
+      return res.status(401).json({
+        err: "Access token expired",
+        code: "ACCESS_TOKEN_EXPIRED",
+      });
     } else {
-      return res.status(401).json({ err: "Invalid Token" });
+      return res.status(401).json({ err: "Invalid access token" });
     }
   }
   //@ts-ignore

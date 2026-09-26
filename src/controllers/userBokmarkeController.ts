@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { bokmarkeTable } from "../models/dbSchemas";
 import { db } from "../utils/dataBaseUtil";
 
@@ -39,4 +39,24 @@ export const addUserBookmarkeToDb = async (
       console.log(`error for user ${userId} at ${new Date()} :\n\n`, err);
     }
   }
+};
+
+export const getUserBookmarksByDomain = async (
+  userId: number,
+  hostName: string
+) => {
+  return db
+    .select({
+      image: bokmarkeTable.imageLink,
+      link: bokmarkeTable.pageLink,
+      addedAtDate: bokmarkeTable.reAddedAt,
+    })
+    .from(bokmarkeTable)
+    .where(
+      and(
+        eq(bokmarkeTable.userId, userId),
+        eq(bokmarkeTable.hostName, hostName)
+      )
+    )
+    .orderBy(desc(bokmarkeTable.reAddedAt), desc(bokmarkeTable.bokmarkeId));
 };

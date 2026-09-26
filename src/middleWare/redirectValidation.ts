@@ -1,7 +1,12 @@
 import { Request, RequestHandler, Response } from "express";
 import { emailVerify } from "../models/zodDataModel";
 import { redirectEmailVerify } from "../controllers/signUpEmailVerifyController";
-import { refreshTokenExp } from "../utils/expirationManager";
+import {
+  accessTokenCookieOptions,
+  dashboardRedirectPath,
+  dashboardRedirectUrl,
+  refreshTokenCookieOptions,
+} from "../utils/authCookies";
 
 export const redirectValidation: RequestHandler = async (
   req: Request,
@@ -22,17 +27,16 @@ export const redirectValidation: RequestHandler = async (
     );
 
     if (response.status) {
-      res.cookie("DR_TAG_TOKEN", response.refreshToken, {
-        httpOnly: true,
-        sameSite: "strict",
-        secure: false,
-        maxAge: refreshTokenExp,
-      });
+      res.cookie("ACCESS_TOKEN", response.accessToken, accessTokenCookieOptions);
+      res.cookie("DR_TAG_TOKEN", response.refreshToken, refreshTokenCookieOptions);
+      if (req.get("accept")?.includes("text/html")) {
+        return res.redirect(303, dashboardRedirectUrl);
+      }
       res.status(201).json({
         status: true,
-        message: response.message,
         accessToken: response.accessToken,
-        dr_Tag: response.refreshToken,
+        message: response.message,
+        redirectTo: dashboardRedirectPath,
       });
     } else {
       res.status(400).json(response.message);

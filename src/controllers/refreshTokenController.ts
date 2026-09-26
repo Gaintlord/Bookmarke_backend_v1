@@ -1,59 +1,65 @@
-import { eq } from "drizzle-orm";
+import { and, eq, gt } from "drizzle-orm";
 import { refreshTokenTable } from "../models/dbSchemas";
 import { db } from "../utils/dataBaseUtil";
-import { HashFunction, hashWCrypto } from "../utils/hashingUtil";
+import { hashWCrypto } from "../utils/hashingUtil";
 import {
   createAccessToken,
   createRefreshToken,
-  decodeRefreshToken,
+  verifyRefreshToken,
 } from "../utils/tokenManager";
 import { refreshTokenExp } from "../utils/expirationManager";
+
+export class RefreshTokenRejectedError extends Error {}
 
 export const refreshTokenRotation = async (
   oldRefToken: string,
   userIp: string,
   userAgent: string
 ) => {
-  let userObj = await decodeRefreshToken(oldRefToken);
-  console.log(userObj);
+  // jwt.verify checks the signature and expiry before any claims are trusted.
+  const userObj = await verifyRefreshToken(oldRefToken);
+  const userId = Number(userObj.userId);
+  if (!Number.isSafeInteger(userId) || userId < 1) {
+    throw new RefreshTokenRejectedError("Invalid refresh-token subject");
+  }
 
-  //@ts-ignore
   const hashedOldToken = await hashWCrypto(userObj.jwtUid);
 
   const { refreshToken, jwtUid } = await createRefreshToken(
-    // @ts-ignore
     userObj.email,
-    // @ts-ignore
     userObj.userId
   );
   const newHashToken = await hashWCrypto(jwtUid);
-  // @ts-ignore
-  const userID = parseInt(userObj.userId);
-  console.log(`!!!!!!!!!! BEFORE TRANSACTION !!!!!!!!!!`);
-  console.log(hashedOldToken);
 
-  try {
-    await db.transaction(async (tx) => {
-      await tx
+  await db.transaction(async (tx) => {
+      // The conditional update makes refresh-token use single-use, including
+      // when two refresh requests arrive at nearly the same time.
+      const revokedToken = await tx
         .update(refreshTokenTable)
         .set({ revoked: true })
-        .where(eq(refreshTokenTable.tokenHash, hashedOldToken));
+        .where(
+          and(
+            eq(refreshTokenTable.tokenHash, hashedOldToken),
+            eq(refreshTokenTable.userId, userId),
+            eq(refreshTokenTable.revoked, false),
+            gt(refreshTokenTable.expiresAt, new Date())
+          )
+        )
+        .returning({ tokenId: refreshTokenTable.Tokenid });
 
-      const response = await tx.insert(refreshTokenTable).values({
-        userId: userID,
+      if (revokedToken.length !== 1) {
+        throw new RefreshTokenRejectedError("Refresh token is revoked or unknown");
+      }
+
+      await tx.insert(refreshTokenTable).values({
+        userId,
         tokenHash: newHashToken,
-        userAgent: userAgent,
+        userAgent,
         ipAddress: userIp,
         expiresAt: new Date(Date.now() + refreshTokenExp),
       });
-    });
-  } catch (err) {
-    console.log(`#######!!!!!!!!!! ${err} !!!!!!!!!! #######`);
-  }
-  console.log(`!!!!!!!!!! AFTER TRANSACTION !!!!!!!!!!`);
+  });
 
-  // @ts-ignore
   const newAccessToken = await createAccessToken(userObj.email, userObj.userId);
-  let newRefToken = refreshToken;
-  return { newAccessToken, newRefToken };
+  return { newAccessToken, newRefToken: refreshToken };
 };

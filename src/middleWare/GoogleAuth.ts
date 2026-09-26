@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import { decodeRefreshToken } from "../utils/tokenManager";
+import jwt from "jsonwebtoken";
 
 const GoogleAuth = async (req: Request, res: Response) => {
   let { code, state } = req.query;
@@ -23,9 +23,11 @@ const GoogleAuth = async (req: Request, res: Response) => {
     });
 
     let userDetail = await response.json();
-    console.log(await decodeRefreshToken(userDetail.id_token));
-    userDetail = await decodeRefreshToken(userDetail.id_token);
-  } else {
+    // Google ID tokens are not application refresh tokens. This endpoint still
+    // needs Google issuer/signature validation before it can establish a session.
+    console.log(jwt.decode(userDetail.id_token));
+    userDetail = jwt.decode(userDetail.id_token);
+  } else { 
     console.log(`potential CSRF at ${new Date(Date.now())}`);
     res.status(403).json({ err: "unsanitized request" });
   }
