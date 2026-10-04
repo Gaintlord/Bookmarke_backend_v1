@@ -55,3 +55,12 @@ getDomainColor matched the full host and hashed the full host for unknowns. | ge
 Frontend COLOR_CLASS had no "black" entry, so a backend color "black" fell back to bg-slate-500. | Frontend COLOR_CLASS now includes black: "bg-black".
 -------|------
 Frontend getDomainColorClass hashed the full host and did not know any brand colors, so locally-added cards never matched the backend. | Frontend mirrors the bare-name DOMAIN_COLORS map, reduces to the first label, and shares the same palette order, so local cards match backend colors (amazon -> amber) and unknown domains hash identically.
+
+
+CREDENTIALED CORS FOR COOKIE-BASED REFRESH
+Files: src/app/app.ts
+
+BEFORE | AFTER
+-------|------
+cors({ origin: "*" }) without credentials: the browser blocks cross-origin responses that carry credentials, so the httpOnly DR_TAG_TOKEN cookie could not be used from the frontend. Password login hid this because it stores the access token in localStorage (Bearer), but Google OAuth only sets cookies, so its /dashboard bootstrap (GET /api/v1/auth/refresh with credentials:"include") always failed and redirected the user to /login.
+| cors({ origin: clientOrigin, credentials: true }): the API now returns Access-Control-Allow-Origin: <CLIENT_ORIGIN> plus Allow-Credentials, so the cross-origin cookie refresh works. Requires CLIENT_ORIGIN to exactly match the frontend origin (scheme + host) and a backend restart. Keep SameSite=Lax: the frontend and an api.<domain> subdomain are the same site, so the cookie is sent.

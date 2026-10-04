@@ -63,3 +63,24 @@ export const refreshTokenRotation = async (
   const newAccessToken = await createAccessToken(userObj.email, userObj.userId);
   return { newAccessToken, newRefToken: refreshToken };
 };
+
+export const revokeRefreshToken = async (oldRefToken: string) => {
+  const userObj = await verifyRefreshToken(oldRefToken);
+  const userId = Number(userObj.userId);
+  if (!Number.isSafeInteger(userId) || userId < 1) {
+    throw new RefreshTokenRejectedError("Invalid refresh-token subject");
+  }
+
+  const hashedOldToken = await hashWCrypto(userObj.jwtUid);
+
+  await db
+    .update(refreshTokenTable)
+    .set({ revoked: true })
+    .where(
+      and(
+        eq(refreshTokenTable.tokenHash, hashedOldToken),
+        eq(refreshTokenTable.userId, userId),
+        eq(refreshTokenTable.revoked, false)
+      )
+    );
+};

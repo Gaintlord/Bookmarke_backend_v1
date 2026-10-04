@@ -7,7 +7,11 @@ export const userTableDB = pgTable("users", {
   userId: integer().primaryKey().generatedAlwaysAsIdentity().primaryKey(),
   userName: varchar({ length: 128 }),
   userEmail: varchar({ length: 255 }).notNull().unique(),
-  userPassword: varchar({ length: 255 }).notNull(),
+  // Null for accounts created through a third-party provider (e.g. Google);
+  // such accounts authenticate with the provider and never with a password.
+  userPassword: varchar({ length: 255 }),
+  googleId: varchar({ length: 255 }).unique(),
+  authProvider: varchar({ length: 32 }).notNull().default("password"),
   otp: varchar({ length: 255 }),
   createdAt: timestamp().defaultNow(),
   updatedAt: timestamp(),

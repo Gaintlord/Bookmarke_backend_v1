@@ -22,7 +22,12 @@ export const logInUser = async (data: {
   if (!userHashedPassNotp.length) {
     return { status: false };
   }
-  if (userHashedPassNotp[0].otp != null) {
+  // Accounts created through a provider (e.g. Google) have no password hash;
+  // they must authenticate with that provider, never here.
+  if (
+    userHashedPassNotp[0].otp != null ||
+    userHashedPassNotp[0].userPassword == null
+  ) {
     return { status: false };
   } else {
     const comapareStatus = await hashVerify(

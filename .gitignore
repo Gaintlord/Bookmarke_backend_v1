@@ -6,8 +6,15 @@ drizzle
 drizzle/*
 !drizzle/0010_chilly_triathlon.sql
 !drizzle/0011_petite_annihilus.sql
+!drizzle/0012_reflective_mojo.sql
 !drizzle/meta/
 drizzle/meta/*
 !drizzle/meta/0010_snapshot.json
 !drizzle/meta/0011_snapshot.json
+!drizzle/meta/0012_snapshot.json
 dist
+verify_email_status.txt
+Google_integration.txt
+DOMAIN_BOOKMARKS_API.txt
+DASHBOARD_API.txt
+changes.txt
